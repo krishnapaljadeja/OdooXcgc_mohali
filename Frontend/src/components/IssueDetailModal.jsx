@@ -53,7 +53,7 @@ export default function IssueDetailModal({
   React.useEffect(() => {
     let isMounted = true;
 
-    if (issue) {
+    if (issue && isOpen) {
       const fetchData = async () => {
         await fetchIssueDetails();
         await fetchStatusHistory();
@@ -66,7 +66,7 @@ export default function IssueDetailModal({
     return () => {
       isMounted = false;
     };
-  }, [issue]);
+  }, [issue, isOpen]);
 
   const fetchIssueDetails = async () => {
     try {

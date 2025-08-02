@@ -118,13 +118,16 @@ function ProblemCard({ problem, isGovOfficial }) {
       }
     };
 
-    fetchAverageRating();
-    fetchUserRating();
+    // Only fetch if modal is not open to prevent duplicate API calls
+    if (!showDetailModal) {
+      fetchAverageRating();
+      fetchUserRating();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [problem.id, dispatch]);
+  }, [problem.id, showDetailModal]);
 
   const handleRating = async (rating) => {
     try {
