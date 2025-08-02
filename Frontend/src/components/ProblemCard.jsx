@@ -501,10 +501,10 @@ function ProblemCard({ problem, isGovOfficial }) {
 
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                {problem?.user?.profilePic ? (
+                {problem?.userProfilePic ? (
                   <img
-                    src={problem.user.profilePic}
-                    alt={problem.user.name}
+                    src={problem.userProfilePic}
+                    alt={problem.userName}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       e.target.style.display = "none";
@@ -514,17 +514,17 @@ function ProblemCard({ problem, isGovOfficial }) {
                 ) : null}
                 <div
                   className={`w-full h-full bg-gray-300 text-[#333] flex items-center justify-center font-bold uppercase ${
-                    problem?.user?.profilePic ? "hidden" : "flex"
+                    problem?.userProfilePic ? "hidden" : "flex"
                   }`}
                 >
-                  {problem?.user?.name?.slice(0, 2) || "U"}
+                  {problem?.userName?.slice(0, 2) || "U"}
                 </div>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">
                   {problem.isAnonymous
                     ? "Anonymous User"
-                    : problem?.user?.name || "Unknown User"}
+                    : problem?.userName|| "Unknown User"}
                 </p>
                 <p className="text-xs text-gray-500">Community Member</p>
               </div>
