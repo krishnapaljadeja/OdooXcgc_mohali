@@ -46,7 +46,6 @@ model Problem {
   user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int?
   location    String
-  clustorId   Int
   status      Status   @default(REPORTED)
   image       String?
   title       String
@@ -58,6 +57,7 @@ model Problem {
   voteCount   Int      @default(0)
   Rating      Rating[]
   category    Category
+  isAnonymous Boolean @default(false)
   createdAt   DateTime @default(now())
 
   @@map("problems")

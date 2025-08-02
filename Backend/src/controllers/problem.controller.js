@@ -1,38 +1,7 @@
 import prisma from "../utils/prismClient.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import axios from "axios";
 
-const TEXT_CLASSIFICATION_API_URL = "http://127.0.0.1:8000/api2/analyze/"; // Update with your Django API URL for text classification
-const ML_CLUSTER_API_URL = "http://127.0.0.1:8000/api1/predict/"; // Django API URL for ML clustering prediction
-
-// Function to classify text using Django API
-const classifyText = async (text) => {
-  try {
-    const response = await axios.post(TEXT_CLASSIFICATION_API_URL, { text });
-    return response.data.text_category || "Other";
-  } catch (error) {
-    console.error("Error classifying text:", error.message);
-    return "Other";
-  }
-};
-
-// Function to get cluster ID using Django ML API
-const getClusterId = async (latitude, longitude) => {
-  try {
-    const response = await axios.get(ML_CLUSTER_API_URL, {
-      params: { latitude, longitude },
-    });
-    // Assuming the Django API returns the cluster ID in "nearest_district"
-    return response.data.nearest_district;
-  } catch (error) {
-    console.error("Error getting cluster ID:", error.message);
-    // Return a default cluster id if an error occurs
-    return 1;
-  }
-};
-
-// Upload problem with text classification and ML cluster ID
 export const uploadProblem = async (req, res) => {
   try {
     const { title, description } = req.body;
@@ -45,22 +14,16 @@ export const uploadProblem = async (req, res) => {
 
     const imageUrl = req.file.path;
 
-    // Call Django API to classify text
-    // const category = await classifyText(description);
     const category = "LIGHTING";
-    // console.log(locationData)
-    // Extract latitude and longitude from locationData and call ML API to get cluster ID
-    const { lat, lng } = locationData;
-    console.log(lat, lng);
-    // const clusterId = await getClusterId(lat, lng);
-    const clusterId = 1;
+    
+    // const { lat, lng } = locationData;
+    // console.log(lat, lng);
 
     const problem = await prisma.problem.create({
       data: {
         title,
         description,
         location: JSON.stringify(locationData),
-        clustorId: clusterId, // Using the ML model cluster id
         image: imageUrl,
         category,
         user: {
@@ -115,41 +78,41 @@ export const getAllProblems = async (req, res) => {
     }
 
     // First, let's check what problems exist and their coordinates
-    const allProblems = await prisma.problem.findMany({
-      select: {
-        id: true,
-        title: true,
-        lat: true,
-        lang: true,
-        location: true
-      }
-    });
+    // const allProblems = await prisma.problem.findMany({
+    //   select: {
+    //     id: true,
+    //     title: true,
+    //     lat: true,
+    //     lang: true,
+    //     location: true
+    //   }
+    // });
     
-    console.log("All problems in database:", allProblems);
+    // console.log("All problems in database:", allProblems);
 
     // Let's also try a simpler query first to see if we can get any problems
-    const simpleProblems = await prisma.$queryRaw`
-      SELECT p.id, p.title, p.location, 
-             p.location::json->>'lat' as extracted_lat,
-             p.location::json->>'lng' as extracted_lng
-      FROM "problems" p
-      WHERE p.location IS NOT NULL 
-        AND p.location::json->>'lat' IS NOT NULL 
-        AND p.location::json->>'lng' IS NOT NULL
-      LIMIT 5;
-    `;
+    // const simpleProblems = await prisma.$queryRaw`
+    //   SELECT p.id, p.title, p.location, 
+    //          p.location::json->>'lat' as extracted_lat,
+    //          p.location::json->>'lng' as extracted_lng
+    //   FROM "problems" p
+    //   WHERE p.location IS NOT NULL 
+    //     AND p.location::json->>'lat' IS NOT NULL 
+    //     AND p.location::json->>'lng' IS NOT NULL
+    //   LIMIT 5;
+    // `;
     
     // Let's also check the actual column names in the database
-    const columnInfo = await prisma.$queryRaw`
-      SELECT column_name, data_type 
-      FROM information_schema.columns 
-      WHERE table_name = 'problems' 
-      AND column_name IN ('lat', 'lang', 'lng');
-    `;
+    // const columnInfo = await prisma.$queryRaw`
+    //   SELECT column_name, data_type 
+    //   FROM information_schema.columns 
+    //   WHERE table_name = 'problems' 
+    //   AND column_name IN ('lat', 'lang', 'lng');
+    // `;
     
-    console.log("Column info:", columnInfo);
+    // console.log("Column info:", columnInfo);
     
-    console.log("Simple query results:", simpleProblems);
+    // console.log("Simple query results:", simpleProblems);
 
     // Use Haversine formula to find problems within radius
     const problems = await prisma.$queryRaw`
@@ -179,7 +142,7 @@ export const getAllProblems = async (req, res) => {
       ORDER BY distance_km ASC;
     `;
 
-    console.log("Problems within radius:", problems);
+    // console.log("Problems within radius:", problems);
 
     if (!problems || problems.length === 0) {
       return res.status(404).json(new ApiError(404, "No problems found within the specified radius"));

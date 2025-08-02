@@ -10,13 +10,11 @@ export const leaderBoard = async ( req , res) => {
         const authorId = req.user.id;
 
         const author = await prisma.user.findFirst({
-          where : { id : authorId },
-          select : { city : true }
+          where : { id : authorId }
         })
 
         const users = await prisma.user.findMany({
             where : {
-              city : author.city,
               isGoverment : false
             },
             include : {
@@ -45,7 +43,7 @@ export const leaderBoard = async ( req , res) => {
                 ReportedProblem++;
               }
             });
-            console.log(ReportedProblem)
+            // console.log(ReportedProblem)
             const avgRating = ratingCount > 0 ? totalRatings / ratingCount : 0;
             const score = totalVotes + avgRating + coins * 2;
         
