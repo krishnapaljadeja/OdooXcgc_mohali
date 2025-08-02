@@ -1,55 +1,94 @@
-import { BASE_URL } from '@/lib/constant';
-import { setProblems } from '@/redux/problemSlice';
-import axios from 'axios';
-import React, { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { BASE_URL } from "@/lib/constant";
+import { setProblems } from "@/redux/problemSlice";
+import { showApiError, showApiWarning } from "@/utils/api-error-handler";
+import axios from "axios";
+import React, { useEffect, useState, useRef } from "react";
+import { useDispatch } from "react-redux";
 
 function GetAllProblems() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const dispatch = useDispatch();
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    const fetchProblems = async (latitude, longitude) => {
-      setLoading(true);
-      try {
-        const response = await axios.get(`${BASE_URL}/issue/all-problem`, {
-          withCredentials: true,
-          params: { latitude, longitude }, 
-        });
+  const fetchProblems = async (latitude, longitude) => {
+    if (!isMountedRef.current) return;
 
-        if (response.data.success) {
-          console.log(response.data); // No need for extra {}
-          dispatch(setProblems(response.data.message));
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get(`${BASE_URL}/issue/all-problem`, {
+        withCredentials: true,
+        params: { latitude, longitude },
+        timeout: 10000, // 10 second timeout
+      });
+
+      if (response.data.success) {
+        dispatch(setProblems(response.data.message));
+        setHasLoaded(true);
+
+        // Only show warning if no problems found and this is the first load
+        if (!response.data.message || response.data.message.length === 0) {
+          showApiWarning(
+            "No issues found in your area",
+            "Be the first to report an issue!"
+          );
         }
-      } catch (error) {
-        setError(error.message || "Something went wrong");
-      } finally {
+      } else {
+        throw new Error(response.data.message || "Failed to fetch problems");
+      }
+    } catch (error) {
+      const errorMessage = showApiError(error, "Failed to load issues");
+      setError(errorMessage);
+    } finally {
+      if (isMountedRef.current) {
         setLoading(false);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch on initial load, not on retries
+    if (hasLoaded) return;
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          fetchProblems(latitude, longitude); // Fetch problems with user location
+          fetchProblems(latitude, longitude);
         },
-        () => {
-          setError("Location access denied or unavailable");
-          fetchProblems(22.596720, 72.834550); // Default location
+        (locationError) => {
+          console.warn("Location access denied or unavailable:", locationError);
+          showApiWarning(
+            "Using default location",
+            "Location access denied. Using default coordinates."
+          );
+          fetchProblems(22.59672, 72.83455); // Default location
+        },
+        {
+          timeout: 10000,
+          enableHighAccuracy: false,
+          maximumAge: 300000, // 5 minutes
         }
       );
     } else {
-      setError("Geolocation is not supported by your browser");
-      fetchProblems(22.596720, 72.834550); // Default location
+      showApiWarning(
+        "Location not supported",
+        "Your browser doesn't support geolocation. Using default location."
+      );
+      fetchProblems(22.59672, 72.83455); // Default location
     }
-  }, [dispatch]);
 
-  if (loading) return <p>Loading...</p>;
-  if (error) return <p className="text-red-500">Error: {error}</p>;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [dispatch, retryCount, hasLoaded]);
 
-  return null; 
+  // Don't render anything - this hook just manages data fetching
+  return null;
 }
 
 export default GetAllProblems;

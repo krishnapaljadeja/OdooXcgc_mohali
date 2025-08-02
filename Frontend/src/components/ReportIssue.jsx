@@ -27,13 +27,15 @@ const containerStyle = {
 
 const center = {
   lat: 22.596878,
-  lng: 72.834550,
+  lng: 72.83455,
 };
 
 function ReportIssue() {
   const [title, setTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [image, setImage] = useState(null);
   const [location, setLocation] = useState(center);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -62,8 +64,16 @@ function ReportIssue() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!title.trim() || !description.trim() || !image || !showMarker) {
-      toast.error("Please fill all fields and select a location");
+    if (
+      !title.trim() ||
+      !description.trim() ||
+      !image ||
+      !showMarker ||
+      !category
+    ) {
+      toast.error(
+        "Please fill all fields, select a category, and select a location"
+      );
       return;
     }
     setIsSubmitting(true);
@@ -71,18 +81,24 @@ function ReportIssue() {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
+      formData.append("category", category);
+      formData.append("isAnonymous", isAnonymous);
       formData.append("image", image);
       formData.append("location", JSON.stringify(location));
 
-      const res = await axios.post(`${BASE_URL}/issue/upload-problem`, formData, {
-        withCredentials: true,
-      });
+      const res = await axios.post(
+        `${BASE_URL}/issue/upload-problem`,
+        formData,
+        {
+          withCredentials: true,
+        }
+      );
 
       if (res.data.success) {
         setShowSuccess(true);
-        dispatch(addProblem(res.data.message))
+        dispatch(addProblem(res.data.message));
         setTimeout(() => {
-        navigate("/home");
+          navigate("/home");
         }, 500);
       }
     } catch (err) {
@@ -166,6 +182,10 @@ function ReportIssue() {
                   setDescription={setDescription}
                   handleImageUpload={handleImageUpload}
                   image={image}
+                  category={category}
+                  setCategory={setCategory}
+                  isAnonymous={isAnonymous}
+                  setIsAnonymous={setIsAnonymous}
                 />
 
                 <div className="space-y-4">
@@ -241,9 +261,9 @@ function ReportIssue() {
                   type="submit"
                   disabled={isSubmitting}
                   className={`w-full py-6 rounded-xl font-semibold shadow-lg transition-all duration-300 ${
-                    isSubmitting 
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                    isSubmitting
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   }`}
                 >
                   {isSubmitting ? (
@@ -257,9 +277,9 @@ function ReportIssue() {
                 </Button>
               </form>
             </div>
+          </motion.div>
         </motion.div>
-        </motion.div>
-    </div>
+      </div>
 
       <AnimatePresence>
         {isSubmitting && (
@@ -319,7 +339,8 @@ function ReportIssue() {
                 Report Submitted Successfully!
               </AlertDialogTitle>
               <AlertDialogDescription className="text-center text-gray-600 mt-2">
-                Your issue has been reported successfully. You will be redirected shortly.
+                Your issue has been reported successfully. You will be
+                redirected shortly.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="w-full bg-gray-100 rounded-full h-1.5 mt-6">

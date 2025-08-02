@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "./ui/button";
-import { Home, BarChart, User, LineChart, Store } from "lucide-react";
+import { Home, BarChart, User, LineChart, Store, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
@@ -18,7 +18,11 @@ function Navbar() {
     console.log("Logging out");
     try {
       // Pass withCredentials as the third argument to axios.post
-      const res = await axios.post(`${BASE_URL}/auth/logout`, {}, { withCredentials: true });
+      const res = await axios.post(
+        `${BASE_URL}/auth/logout`,
+        {},
+        { withCredentials: true }
+      );
       if (res.data.success) {
         toast.success("Logged out successfully");
         navigate("/");
@@ -54,23 +58,29 @@ function Navbar() {
                 </Button>
               </Link>
 
+              {/* Analytics - Only for government users */}
+              {user.isGoverment && (
+                <Link to="/analytics">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Analytics
+                  </Button>
+                </Link>
+              )}
 
-              <Link to="/analytics">
-                <Button variant="outline" size="sm">
-                  <LineChart className="h-4 w-4 mr-2" />
-                  Analytics
-                </Button>
-              </Link>
-
-              {!user.isGoverment && 
-
-              <Link to="/store-cart">
-                <Button variant="outline" size="sm">
-                  <Store className="h-4 w-4 mr-2" />
-                  Store
-                </Button>
-              </Link>
-              }
+              {/* Store - Only for regular users */}
+              {!user.isGoverment && (
+                <Link to="/store-cart">
+                  <Button variant="outline" size="sm">
+                    <Store className="h-4 w-4 mr-2" />
+                    Store
+                  </Button>
+                </Link>
+              )}
 
               <Link to={`/profile/${user.id}`}>
                 <Button variant="outline" size="sm">
@@ -89,7 +99,10 @@ function Navbar() {
             </>
           ) : (
             <Link to="/login">
-              <Button variant="outline" className="bg-blue-600 hover:bg-blue-500 text-white hover:text-white">
+              <Button
+                variant="outline"
+                className="bg-blue-600 hover:bg-blue-500 text-white hover:text-white"
+              >
                 Sign In
               </Button>
             </Link>

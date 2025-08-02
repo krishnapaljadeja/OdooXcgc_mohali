@@ -6,52 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  LoadingSpinner,
+  LoadingSkeleton,
+} from "@/components/ui/loading-spinner";
+import { EmptyStateWithFilters } from "@/components/ui/empty-state";
 import ProblemList from "./ProblemCard";
-
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import GetAllProblems from "@/hooks/GetAllProblems";
-
-const problems = [
-  {
-    id: 1,
-    title: "Broken Street Light",
-    description:"Street light at Main St. and 5th Ave has been out for 2 weeks",
-    category: "Infrastructure",
-    status: "open",
-    voteCount: 45,
-    ratings: [],
-    image: img,
-    author: "John Doe",
-    isAuthor: true,
-  },
-  {
-    id: 2,
-    title: "Garbage Collection Delay",
-    description: "No garbage collection in Cedar neighborhood for past week",
-    category: "Sanitation",
-    status: "in-progress",
-    voteCount: 32,
-    rating: 3.8,
-    image: img,
-    author: "Jane Smith",
-    isAuthor: false,
-  },
-];
-
+import { toast } from "sonner";
 
 const categories = [
   "All",
@@ -60,58 +31,150 @@ const categories = [
   "COMMUNITY_SERVICES",
 ];
 const statuses = ["All", "REPORTED", "IN_PROGRESS", "COMPLETED"];
+const distances = ["All", "1km", "3km", "5km"];
 
 export default function ProblemItem() {
-
   const user = useSelector((state) => state.user.user);
   const [role, setRole] = useState("user");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedStatus, setSelectedStatus] = useState("All");
+  const [selectedDistance, setSelectedDistance] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+
+  const problems = useSelector((state) => state.problem.problems);
+
   useEffect(() => {
     if (user) {
       setRole(user.isGoverment ? "goverment" : "user");
     }
-  }, [user])
-  
-  // console.log(user);
-  const isGovOfficial = role === "goverment"; 
-  
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedStatus, setSelectedStatus] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-  const [isLoading, setIsLoading] = useState(false);
+  }, [user]);
 
-  const problems = useSelector((state) => state.problem.problems);
+  const isGovOfficial = role === "goverment";
 
   const filteredProblems = React.useMemo(() => {
-    return (problems || []).filter(
+    if (!problems || problems.length === 0) return [];
+
+    let filtered = problems.filter(
       (problem) =>
         (selectedCategory === "All" || problem.category === selectedCategory) &&
         (selectedStatus === "All" || problem.status === selectedStatus) &&
         problem.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [problems, selectedCategory, selectedStatus, searchQuery]);
-  
+
+    // Filter flagged issues for government users
+    if (isGovOfficial && showFlaggedOnly) {
+      filtered = filtered.filter(
+        (problem) => problem.flagCount > 0 || problem.isHidden
+      );
+    }
+
+    return filtered;
+  }, [
+    problems,
+    selectedCategory,
+    selectedStatus,
+    searchQuery,
+    isGovOfficial,
+    showFlaggedOnly,
+  ]);
 
   const sortedProblems = React.useMemo(() => {
     const sorted = [...filteredProblems];
     switch (sortBy) {
       case "newest":
-        return sorted.sort((a, b) => b.id - a.id);
+        return sorted.sort(
+          (a, b) =>
+            new Date(b.createdAt || b.id) - new Date(a.createdAt || a.id)
+        );
       case "voteCount":
-        return sorted.sort((a, b) => b.voteCount - a.voteCount);
+        return sorted.sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
       case "rating":
-        return sorted.sort((a, b) => b.rating - a.rating);
+        // Sort by averageRating if available, otherwise by voteCount as fallback
+        return sorted.sort((a, b) => {
+          // Get the current averageRating from the Redux state
+          const ratingA = a.averageRating || 0;
+          const ratingB = b.averageRating || 0;
+          if (ratingA === ratingB) {
+            // If ratings are equal, sort by vote count
+            return (b.voteCount || 0) - (a.voteCount || 0);
+          }
+          return ratingB - ratingA;
+        });
       default:
         return sorted;
     }
   }, [filteredProblems, sortBy]);
 
+  const handleClearFilters = () => {
+    setSelectedCategory("All");
+    setSelectedStatus("All");
+    setSelectedDistance("All");
+    setSearchQuery("");
+    setShowFlaggedOnly(false);
+    toast.success("Filters cleared");
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
+            >
+              <LoadingSkeleton lines={4} />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (sortedProblems.length === 0) {
+      return (
+        <EmptyStateWithFilters
+          onClearFilters={handleClearFilters}
+          searchQuery={searchQuery}
+          selectedCategory={selectedCategory}
+          selectedStatus={selectedStatus}
+          selectedDistance={selectedDistance}
+        />
+      );
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
+        {sortedProblems.map((problem, index) => (
+          <motion.div
+            key={problem.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+          >
+            <ProblemList problem={problem} isGovOfficial={isGovOfficial} />
+          </motion.div>
+        ))}
+      </motion.div>
+    );
+  };
+
   return (
-    <SidebarProvider>
-      <div className="grid grid-cols-[300px_1fr]">
-        <Sidebar className="bg-white rounded-xl shadow-sm border border-gray-100 h-[84vh] m-5 mt-24">
-          <SidebarContent className="p-6">
-            <div className="mb-4">
+    <div className="min-h-screen w-screen bg-gray-100">
+      <div className="w-full px-8 py-3 flex gap-6">
+        {/* Filters Sidebar */}
+        <div className="w-80 bg-white rounded-xl shadow-sm border border-gray-100 h-fit sticky top-24">
+          <div className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                Filters
+              </h3>
               <Input
                 placeholder="Search issues..."
                 className="w-full"
@@ -121,98 +184,177 @@ export default function ProblemItem() {
               />
             </div>
 
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-lg font-semibold text-gray-800">
-                Categories
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="mt-3">
-                <SidebarMenu>
-                  {categories.map((category) => (
-                    <SidebarMenuItem key={category}>
-                      <SidebarMenuButton
-                        className={`w-full rounded-lg transition-all duration-200 ${
-                          selectedCategory === category
-                            ? "bg-blue-50 text-blue-600"
-                            : "hover:bg-gray-50"
-                        }`}
-                        isActive={selectedCategory === category}
-                        onClick={() => setSelectedCategory(category)}
-                      >
-                        <span className="flex items-center gap-2">
-                        {category.charAt(0).toUpperCase() + category.slice(1).toLowerCase()}
-                          <Badge variant="outline" className="ml-auto">
-                            {
-                              problems?.filter(
-                                (p) =>
-                                  category === "All" || p.category === category
-                              ).length
-                            }
+            <div className="space-y-4">
+              {/* Category Filter */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Category
+                </label>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>
+                            {category === "All"
+                              ? "All Categories"
+                              : category.charAt(0).toUpperCase() +
+                                category.slice(1).toLowerCase()}
+                          </span>
+                          <Badge variant="outline" className="ml-2">
+                            {problems?.filter(
+                              (p) =>
+                                category === "All" || p.category === category
+                            ).length || 0}
                           </Badge>
-                        </span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            <Separator className="my-6" />
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-lg font-semibold text-gray-800">
-                Status
-              </SidebarGroupLabel>
-              <SidebarGroupContent className="mt-3">
-                <SidebarMenu>
-                  {statuses.map((status) => (
-                    <SidebarMenuItem key={status}>
-                      <SidebarMenuButton
-                        className={`w-full rounded-lg transition-all duration-200 ${
-                          selectedStatus === status
-                            ? "bg-blue-50 text-blue-600"
-                            : "hover:bg-gray-50"
-                        }`}
-                        isActive={selectedStatus === status}
-                        onClick={() => setSelectedStatus(status)}
-                      >
-                        <span className="flex items-center gap-2">
-                        {status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()}
-                          <Badge variant="outline" className="ml-auto">
-                            {
-                              problems?.filter(
-                                (p) => status === "All" || p.status === status
-                              ).length
-                            }
+              {/* Status Filter */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Status
+                </label>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>
+                            {status === "All"
+                              ? "All Statuses"
+                              : status.charAt(0).toUpperCase() +
+                                status.slice(1).toLowerCase()}
+                          </span>
+                          <Badge variant="outline" className="ml-2">
+                            {problems?.filter(
+                              (p) => status === "All" || p.status === status
+                            ).length || 0}
                           </Badge>
-                        </span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Distance Filter */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Distance
+                </label>
+                <Select
+                  value={selectedDistance}
+                  onValueChange={setSelectedDistance}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select distance" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {distances.map((distance) => (
+                      <SelectItem key={distance} value={distance}>
+                        {distance === "All" ? "Any Distance" : distance}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Flagged Issues Filter - Only for Government Users */}
+              {isGovOfficial && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Issue Status
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="flaggedOnly"
+                      checked={showFlaggedOnly}
+                      onChange={(e) => setShowFlaggedOnly(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="flaggedOnly"
+                      className="text-sm text-gray-600"
+                    >
+                      Show flagged issues only
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Clear Filters Button */}
+              {(selectedCategory !== "All" ||
+                selectedStatus !== "All" ||
+                selectedDistance !== "All" ||
+                searchQuery ||
+                showFlaggedOnly) && (
+                <Button
+                  variant="outline"
+                  onClick={handleClearFilters}
+                  className="w-full mt-4"
+                >
+                  Clear All Filters
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
         <main className="flex-1">
-          <div className="bg-white rounded-xl min-w-[70vw] shadow-sm border border-gray-100 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
             <div className="p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <ListFilter className="h-6 w-6 text-blue-600" />
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {selectedCategory} Issues
+                  {selectedCategory === "All" ? "All" : selectedCategory} Issues
                   <span className="text-gray-400 mx-2">•</span>
-                  <span className="text-blue-600">{selectedStatus}</span>
+                  <span className="text-blue-600">
+                    {selectedStatus === "All" ? "All Statuses" : selectedStatus}
+                  </span>
+                  {selectedDistance !== "All" && (
+                    <>
+                      <span className="text-gray-400 mx-2">•</span>
+                      <span className="text-green-600">{selectedDistance}</span>
+                    </>
+                  )}
+                  {sortedProblems.length > 0 && (
+                    <span className="text-gray-500 text-sm ml-2">
+                      ({sortedProblems.length}{" "}
+                      {sortedProblems.length === 1 ? "issue" : "issues"})
+                    </span>
+                  )}
                 </h2>
               </div>
               <div className="flex items-center gap-4">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="voteCount">Most voteCount</option>
-                  <option value="rating">Highest Rated</option>
-                </select>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="voteCount">Most Votes</SelectItem>
+                    <SelectItem value="rating">Highest Rated</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 {role === "user" && (
                   <Link to="/report-issue">
@@ -226,59 +368,9 @@ export default function ProblemItem() {
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-xl h-[400px] w-[400px] animate-pulse"
-                />
-              ))}
-            </div>
-          ) : sortedProblems.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100"
-            >
-              <div className="max-w-md mx-auto">
-                <p className="text-gray-600 mb-6">
-                  Try adjusting your filters or search terms to find what you're
-                  looking for.
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedCategory("All");
-                    setSelectedStatus("All");
-                    setSearchQuery("");
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {sortedProblems.map((problem, index) => (
-                <motion.div
-                  key={problem.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <ProblemList problem={problem} isGovOfficial={isGovOfficial} />
-
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
+          {renderContent()}
         </main>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }

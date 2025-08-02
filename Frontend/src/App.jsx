@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
+import ErrorBoundary from "./components/ui/error-boundary";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import Landing from "./pages/Landing";
@@ -9,25 +11,28 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import StorePage from "./pages/StorePage";
 import Analytics2 from "./pages/Analytics2";
+
 function App() {
   return (
-    <Router>
-      <Navbar />
-      <div className="pt-20"> 
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/leaderboard" element={<LeaderBoard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/report-issue" element={<ReportIssue />} />
-          <Route path="/profile/:userId" element={<Profile />} />
-          <Route path="/store-cart" element={<StorePage />} />
-          <Route path="/analytics2" element={<Analytics2 />} />
-          
-        </Routes>
-      </div>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <Navbar />
+        <div className="pt-20">
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/leaderboard" element={<LeaderBoard />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/report-issue" element={<ReportIssue />} />
+            <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/store-cart" element={<StorePage />} />
+            <Route path="/analytics2" element={<Analytics2 />} />
+          </Routes>
+        </div>
+        <Toaster position="top-right" richColors closeButton duration={4000} />
+      </Router>
+    </ErrorBoundary>
   );
 }
 
