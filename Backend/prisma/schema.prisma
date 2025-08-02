@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Status {
+  REPORTED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum Category {
+  INFRASTURCTURE
+  ENVIRONMENT
+  COMMUNITY_SERVICES
+  OTHER
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  name          String
+  password      String
+  houseLocation String?
+  city          String?
+  rank          Int      @default(0)
+  coins         Int?     @default(0)
+  profilePic    String?
+  createdAt     DateTime @default(now())
+  isGoverment   Boolean  @default(false)
+
+  problems Problem[]
+  Vote     Vote[]
+  Rating   Rating[]
+}
+
+model Problem {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  location    String
+  clustorId   Int
+  status      Status   @default(REPORTED)
+  image       String?
+  title       String
+  description String
+  lang        Float?
+  lat         Float?
+  rating      Int?     @default(0) @db.SmallInt
+  votes       Vote[]
+  voteCount   Int      @default(0)
+  Rating      Rating[]
+  category    Category
+  createdAt   DateTime @default(now())
+
+  @@map("problems")
+}
+
+model Vote {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  problemId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, problemId])
+}
+
+model Rating {
+  id        Int     @id @default(autoincrement())
+  rating    Int     @default(1)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId Int
+
+  @@unique([userId, problemId])
+}
+
+model Analytics {
+  id             Int      @id @default(autoincrement())
+  totalProblems  Int      @default(0)
+  solvedProblems Int      @default(0)
+  inProgress     Int      @default(0)
+  rejected       Int      @default(0)
+  lastUpdated    DateTime @default(now())
+
+  @@map("analytics")
+}
