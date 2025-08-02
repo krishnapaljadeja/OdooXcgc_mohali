@@ -85,6 +85,16 @@ body{
   overflow-x : hidden;
 }
 
+/* Ensure modals appear above Leaflet maps */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+/* Modal z-index override for map pages */
+.modal-overlay {
+  z-index: 9999 !important;
+}
+
 
 
 @layer base {

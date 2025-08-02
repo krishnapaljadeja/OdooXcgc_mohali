@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import StorePage from "./pages/StorePage";
 import Analytics2 from "./pages/Analytics2";
+import IssuesMap from "./components/IssuesMap";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
             <Route path="/profile/:userId" element={<Profile />} />
             <Route path="/store-cart" element={<StorePage />} />
             <Route path="/analytics2" element={<Analytics2 />} />
+            <Route path="/map" element={<IssuesMap />} />
           </Routes>
         </div>
         <Toaster

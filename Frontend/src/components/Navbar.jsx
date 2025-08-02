@@ -8,6 +8,7 @@ import {
   Store,
   Shield,
   Flag,
+  Map,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -63,6 +64,13 @@ function Navbar() {
                 <Button variant="outline" size="sm">
                   <BarChart className="h-4 w-4 mr-2" />
                   Leaderboard
+                </Button>
+              </Link>
+
+              <Link to="/map">
+                <Button variant="outline" size="sm">
+                  <Map className="h-4 w-4 mr-2" />
+                  Map
                 </Button>
               </Link>
 
