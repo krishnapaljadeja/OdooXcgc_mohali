@@ -149,15 +149,21 @@ export const getAllProblems = async (req, res) => {
     }
 
     // Convert BigInt values to regular numbers to fix JSON serialization issue
-    const serializedProblems = problems.map(problem => {
+    const serializedProblems = problems.map((problem) => {
       const serialized = { ...problem };
       // Convert any BigInt fields to regular numbers
-      if (typeof serialized.id === 'bigint') serialized.id = Number(serialized.id);
-      if (typeof serialized.userId === 'bigint') serialized.userId = Number(serialized.userId);
-      if (typeof serialized.voteCount === 'bigint') serialized.voteCount = Number(serialized.voteCount);
-      if (typeof serialized.rating === 'bigint') serialized.rating = Number(serialized.rating);
-      if (typeof serialized.flagCount === 'bigint') serialized.flagCount = Number(serialized.flagCount);
-      if (typeof serialized.distance_km === 'bigint') serialized.distance_km = Number(serialized.distance_km);
+      if (typeof serialized.id === "bigint")
+        serialized.id = Number(serialized.id);
+      if (typeof serialized.userId === "bigint")
+        serialized.userId = Number(serialized.userId);
+      if (typeof serialized.voteCount === "bigint")
+        serialized.voteCount = Number(serialized.voteCount);
+      if (typeof serialized.rating === "bigint")
+        serialized.rating = Number(serialized.rating);
+      if (typeof serialized.flagCount === "bigint")
+        serialized.flagCount = Number(serialized.flagCount);
+      if (typeof serialized.distance_km === "bigint")
+        serialized.distance_km = Number(serialized.distance_km);
       return serialized;
     });
 
