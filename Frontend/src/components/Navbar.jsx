@@ -1,6 +1,14 @@
 import React from "react";
 import { Button } from "./ui/button";
-import { Home, BarChart, User, LineChart, Store, Shield } from "lucide-react";
+import {
+  Home,
+  BarChart,
+  User,
+  LineChart,
+  Store,
+  Shield,
+  Flag,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
@@ -60,16 +68,28 @@ function Navbar() {
 
               {/* Analytics - Only for government users */}
               {user.isGoverment && (
-                <Link to="/analytics">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Analytics
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/analytics">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Analytics
+                    </Button>
+                  </Link>
+                  <Link to="/flagged-issues">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Flagged Issues
+                    </Button>
+                  </Link>
+                </>
               )}
 
               {/* Store - Only for regular users */}

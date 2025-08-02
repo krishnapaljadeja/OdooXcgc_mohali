@@ -179,26 +179,26 @@ function ProblemCard({ problem, isGovOfficial }) {
 
   const handleReportSpam = async () => {
     if (isReported) {
-      toast.info("You have already reported this issue");
+      toast.info("You have already flagged this issue");
       return;
     }
 
     setReportLoading(true);
     try {
       const response = await axios.post(
-        `${BASE_URL}/issue/report-spam/${problem.id}`,
-        {},
+        `${BASE_URL}/gov/flag/${problem.id}`,
+        { reason: "Inappropriate content" },
         { withCredentials: true }
       );
 
       if (response.data.success) {
         setIsReported(true);
         toast.success(
-          "Issue reported for review. Thank you for helping keep the community safe."
+          "Issue flagged for review. Thank you for helping keep the community safe."
         );
       }
     } catch (error) {
-      toast.error("Failed to report issue. Please try again.");
+      toast.error("Failed to flag issue. Please try again.");
     } finally {
       setReportLoading(false);
     }
@@ -422,6 +422,16 @@ function ProblemCard({ problem, isGovOfficial }) {
                 {status}
               </div>
             </Badge>
+
+            {/* Flag Count Badge for Government Officials */}
+            {isGovOfficial && problem.flagCount > 0 && (
+              <Badge className="px-3 py-1.5 text-sm font-medium rounded-full shadow-lg backdrop-blur-sm bg-red-500/90 text-white hover:bg-red-500">
+                <div className="flex items-center gap-1.5">
+                  <Flag className="w-3 h-3" />
+                  {problem.flagCount} flag{problem.flagCount > 1 ? "s" : ""}
+                </div>
+              </Badge>
+            )}
           </div>
 
           <div className="absolute bottom-4 left-4">

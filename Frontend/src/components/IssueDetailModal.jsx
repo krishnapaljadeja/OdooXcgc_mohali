@@ -325,12 +325,21 @@ export default function IssueDetailModal({
 
   const fetchModerationData = async () => {
     try {
-      // This would be a new API endpoint to fetch moderation data
-      // For now, we'll use mock data
-      setFlagCount(Math.floor(Math.random() * 5)); // Mock flag count
+      // Fetch actual flag count from the backend
+      const flagCountResponse = await axios.get(
+        `${BASE_URL}/gov/flag-count/${issue.id}`,
+        { withCredentials: true }
+      );
+
+      if (flagCountResponse.data.success) {
+        setFlagCount(flagCountResponse.data.flagCount);
+      }
+
       setIsModerated(issue.status !== "REPORTED");
     } catch (error) {
       console.error("Error fetching moderation data:", error);
+      // Fallback to 0 if there's an error
+      setFlagCount(0);
     }
   };
 
@@ -376,27 +385,28 @@ export default function IssueDetailModal({
 
   const handleReportSpam = async () => {
     if (isReported) {
-      toast.info("You have already reported this issue");
+      toast.info("You have already flagged this issue");
       return;
     }
 
     setReportLoading(true);
     try {
       const response = await axios.post(
-        `${BASE_URL}/issue/report-spam/${issue.id}`,
-        {},
+        `${BASE_URL}/gov/flag/${issue.id}`,
+        { reason: "Inappropriate content" },
         { withCredentials: true }
       );
 
       if (response.data.success) {
         setIsReported(true);
-        setFlagCount((prev) => prev + 1);
+        // Refresh the flag count from the server
+        await fetchModerationData();
         toast.success(
-          "Issue reported for review. Thank you for helping keep the community safe."
+          "Issue flagged for review. Thank you for helping keep the community safe."
         );
       }
     } catch (error) {
-      toast.error("Failed to report issue. Please try again.");
+      toast.error("Failed to flag issue. Please try again.");
     } finally {
       setReportLoading(false);
     }

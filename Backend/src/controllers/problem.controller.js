@@ -71,9 +71,9 @@ export const getAllProblems = async (req, res) => {
     const radius = parseFloat(req.query.radius || "5"); // Default radius 5km
     const userId = req.user.id;
 
-    console.log(
-      `getAllProblems called with radius: ${radius}km, userId: ${userId}`
-    );
+    // console.log(
+    //   `getAllProblems called with radius: ${radius}km, userId: ${userId}`
+    // );
 
     // Get user's current location
     const user = await prisma.user.findUnique({
@@ -106,6 +106,7 @@ export const getAllProblems = async (req, res) => {
         p.*,
         u.name as "userName",
         u."profilePic" as "userProfilePic",
+        COALESCE(flag_counts.flag_count, 0) as "flagCount",
         (
           6371 * acos(
             cos(radians(${userLat})) * cos(radians((p.location::json->>'lat')::float)) *
@@ -115,6 +116,13 @@ export const getAllProblems = async (req, res) => {
         ) AS distance_km
       FROM "problems" p
       LEFT JOIN "User" u ON p."userId" = u.id
+      LEFT JOIN (
+        SELECT 
+          "problemId",
+          COUNT(*) as flag_count
+        FROM "flagged_issues"
+        GROUP BY "problemId"
+      ) flag_counts ON p.id = flag_counts."problemId"
       WHERE p.location IS NOT NULL 
         AND p.location::json->>'lat' IS NOT NULL 
         AND p.location::json->>'lng' IS NOT NULL
@@ -140,9 +148,22 @@ export const getAllProblems = async (req, res) => {
         );
     }
 
+    // Convert BigInt values to regular numbers to fix JSON serialization issue
+    const serializedProblems = problems.map(problem => {
+      const serialized = { ...problem };
+      // Convert any BigInt fields to regular numbers
+      if (typeof serialized.id === 'bigint') serialized.id = Number(serialized.id);
+      if (typeof serialized.userId === 'bigint') serialized.userId = Number(serialized.userId);
+      if (typeof serialized.voteCount === 'bigint') serialized.voteCount = Number(serialized.voteCount);
+      if (typeof serialized.rating === 'bigint') serialized.rating = Number(serialized.rating);
+      if (typeof serialized.flagCount === 'bigint') serialized.flagCount = Number(serialized.flagCount);
+      if (typeof serialized.distance_km === 'bigint') serialized.distance_km = Number(serialized.distance_km);
+      return serialized;
+    });
+
     return res
       .status(200)
-      .json(new ApiResponse(200, "Problems found", problems));
+      .json(new ApiResponse(200, "Problems found", serializedProblems));
   } catch (err) {
     console.error("Error in getAllProblems:", err);
     return res.status(500).json(new ApiError(500, err.message));

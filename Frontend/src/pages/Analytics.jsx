@@ -61,62 +61,58 @@ export default function Analytics() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      // In a real app, you would have dedicated analytics endpoints
-      // For now, we'll calculate analytics from the existing problems data
-      const totalIssues = problems?.length || 0;
-      const reportedIssues =
-        problems?.filter((p) => p.status === "REPORTED").length || 0;
-      const inProgressIssues =
-        problems?.filter((p) => p.status === "IN_PROGRESS").length || 0;
-      const completedIssues =
-        problems?.filter((p) => p.status === "COMPLETED").length || 0;
-      const rejectedIssues =
-        problems?.filter((p) => p.status === "REJECTED").length || 0;
-
-      // Calculate top categories
-      const categoryCounts = {};
-      problems?.forEach((problem) => {
-        categoryCounts[problem.category] =
-          (categoryCounts[problem.category] || 0) + 1;
+      // Fetch analytics from backend
+      const response = await axios.get(`${BASE_URL}/gov/analytics`, {
+        withCredentials: true,
       });
 
-      const topCategories = Object.entries(categoryCounts)
-        .map(([category, count]) => ({ category, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+      if (response.data.success) {
+        const { analytics } = response.data;
 
-      // Mock recent activity
-      const recentActivity =
-        problems?.slice(0, 10).map((problem) => ({
-          id: problem.id,
-          title: problem.title,
-          action:
-            problem.status === "REPORTED"
-              ? "reported"
-              : problem.status === "IN_PROGRESS"
-              ? "approved"
-              : problem.status === "COMPLETED"
-              ? "completed"
-              : "rejected",
-          timestamp: problem.createdAt,
-          user: problem.user?.name || "Anonymous",
-        })) || [];
+        // Calculate top categories from problems data
+        const categoryCounts = {};
+        problems?.forEach((problem) => {
+          categoryCounts[problem.category] =
+            (categoryCounts[problem.category] || 0) + 1;
+        });
 
-      setAnalyticsData({
-        totalIssues,
-        reportedIssues,
-        inProgressIssues,
-        completedIssues,
-        rejectedIssues,
-        flaggedIssues: Math.floor(Math.random() * 10), // Mock data
-        topCategories,
-        recentActivity,
-        userStats: {
-          totalUsers: Math.floor(Math.random() * 1000) + 500,
-          activeUsers: Math.floor(Math.random() * 500) + 200,
-          bannedUsers: Math.floor(Math.random() * 10),
-        },
-      });
+        const topCategories = Object.entries(categoryCounts)
+          .map(([category, count]) => ({ category, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        // Recent activity from problems data
+        const recentActivity =
+          problems?.slice(0, 10).map((problem) => ({
+            id: problem.id,
+            title: problem.title,
+            action:
+              problem.status === "REPORTED"
+                ? "reported"
+                : problem.status === "IN_PROGRESS"
+                ? "approved"
+                : problem.status === "COMPLETED"
+                ? "completed"
+                : "rejected",
+            timestamp: problem.createdAt,
+            user: problem.user?.name || "Anonymous",
+          })) || [];
+
+        setAnalyticsData({
+          totalIssues: analytics.problemStats.totalProblems,
+          reportedIssues: analytics.problemStats.reportedProblems,
+          inProgressIssues: analytics.problemStats.inProgressProblems,
+          completedIssues: analytics.problemStats.completedProblems,
+          rejectedIssues: analytics.problemStats.rejectedProblems,
+          flaggedIssues: analytics.problemStats.flaggedProblems,
+          topCategories,
+          recentActivity,
+          userStats: {
+            totalUsers: analytics.userStats.totalUsers,
+            bannedUsers: analytics.userStats.bannedUsers,
+          },
+        });
+      }
     } catch (error) {
       console.error("Error fetching analytics:", error);
       toast.error("Failed to load analytics data");
@@ -228,7 +224,7 @@ export default function Analytics() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -246,7 +242,7 @@ export default function Analytics() {
                   {analyticsData.totalIssues}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  +12% from last month
+                  All reported issues
                 </p>
               </CardContent>
             </Card>
@@ -314,6 +310,25 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+                <XCircle className="h-4 w-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-gray-600">
+                  {analyticsData.rejectedIssues}
+                </div>
+                <p className="text-xs text-muted-foreground">Not approved</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
         {/* Charts and Details */}
@@ -371,12 +386,6 @@ export default function Analytics() {
                     <span className="text-sm text-gray-600">Total Users</span>
                     <span className="font-semibold">
                       {analyticsData.userStats.totalUsers}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Active Users</span>
-                    <span className="font-semibold text-green-600">
-                      {analyticsData.userStats.activeUsers}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

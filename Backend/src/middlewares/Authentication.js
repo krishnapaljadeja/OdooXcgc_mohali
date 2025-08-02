@@ -2,7 +2,7 @@ import { ApiError } from "../utils/ApiError.js";
 import prisma from "../utils/prismClient.js";
 import jwt from "jsonwebtoken";
 
-const isAuthenticated = async (req, res ,next) => {
+const isAuthenticated = async (req, res, next) => {
   try {
     const token = req.cookies?.token;
     if (!token) {
@@ -28,12 +28,25 @@ const isAuthenticated = async (req, res ,next) => {
         .json(new ApiError(401, "User not authenticated", ["Unauthorized"]));
     }
 
+    // Check if user is banned
+    if (user.isBanned) {
+      return res
+        .status(403)
+        .json(
+          new ApiError(
+            403,
+            "Your account has been banned. Please contact support.",
+            ["Account Banned"]
+          )
+        );
+    }
+
     req.user = user;
     next();
   } catch (err) {
     return res
       .status(500)
-      .json(new ApiError(500,err.message || "Internal Server Error", err));
+      .json(new ApiError(500, err.message || "Internal Server Error", err));
   }
 };
 

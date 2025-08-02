@@ -9,7 +9,7 @@ export const loginUser = async (req, res) => {
     const { email, password, lat, long } = req.body;
 
     // let address = "";
-    console.log(lat , long)
+    console.log(lat, long);
 
     // try {
     //   const response = await fetch(
@@ -33,6 +33,18 @@ export const loginUser = async (req, res) => {
       return res.status(404).json(new ApiError(404, "User not found"));
     }
 
+    // Check if user is banned
+    if (user.isBanned) {
+      return res
+        .status(403)
+        .json(
+          new ApiError(
+            403,
+            "Your account has been banned. Please contact support for more information."
+          )
+        );
+    }
+
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json(new ApiError(401, "Invalid Credentials"));
@@ -45,9 +57,7 @@ export const loginUser = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
     });
 
-    res
-      .status(200)
-      .json(new ApiResponse(200, "Login Successfull", { user }));
+    res.status(200).json(new ApiResponse(200, "Login Successfull", { user }));
   } catch (err) {
     console.log(err);
     return res.status(500).json(new ApiError(500, "internal Server Error"));
@@ -72,6 +82,16 @@ export const signup = async (req, res) => {
       },
     });
     if (isExist) {
+      if (isExist.isBanned) {
+        return res
+          .status(403)
+          .json(
+            new ApiError(
+              403,
+              "This email is associated with a banned account. Please contact support for more information."
+            )
+          );
+      }
       return res.status(404).json(new ApiError(402, "User already exist"));
     }
     // try {
@@ -130,7 +150,6 @@ export const logoutUser = async (req, res) => {
   }
 };
 
-
 export const getProfile = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -153,7 +172,7 @@ export const getProfile = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json(new ApiError(404 , "User not found"));
+      return res.status(404).json(new ApiError(404, "User not found"));
     }
 
     const analytics = await prisma.analytics.findFirst();
@@ -161,9 +180,7 @@ export const getProfile = async (req, res) => {
     const formattedProfile = {
       name: user.name,
       email: user.email,
-      address: user.houseLocation
-        ? `${user.houseLocation}`
-        : "Not Provided",
+      address: user.houseLocation ? `${user.houseLocation}` : "Not Provided",
       avatar: user.profilePic || "/default-avatar.jpg",
       joinedDate: user.createdAt.toLocaleDateString("en-US", {
         year: "numeric",
@@ -191,7 +208,7 @@ export const getProfile = async (req, res) => {
     };
 
     // res.json(formattedProfile);
-    return res.status(200).json(new ApiResponse(200 , formattedProfile));
+    return res.status(200).json(new ApiResponse(200, formattedProfile));
   } catch (error) {
     console.error("Error fetching profile:", error);
     res.status(500).json({ message: "Internal server error" });

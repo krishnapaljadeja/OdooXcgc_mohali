@@ -17,7 +17,9 @@ export const handleApiError = (error, customMessage = null) => {
         errorMessage = "Please log in to continue";
         break;
       case 403:
-        errorMessage = "You don't have permission to perform this action";
+        errorMessage =
+          error.response.data?.message ||
+          "You don't have permission to perform this action";
         break;
       case 404:
         errorMessage = "Resource not found";

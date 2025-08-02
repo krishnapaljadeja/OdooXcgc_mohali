@@ -37,8 +37,8 @@ export default function Login() {
     password: "",
     name: "",
     confirmPassword: "",
-    lat : 22.596720,
-    long : 72.834550,
+    lat: 22.59672,
+    long: 72.83455,
   });
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -73,7 +73,11 @@ export default function Login() {
         navigate("/home");
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "An error occurred");
+      if (err.response?.status === 403) {
+        toast.error(err.response?.data?.message || "Account banned");
+      } else {
+        toast.error(err.response?.data?.message || "An error occurred");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,8 +98,8 @@ export default function Login() {
       password: "",
       name: "",
       confirmPassword: "",
-      lat: 22.596720,
-      long: 72.834550,
+      lat: 22.59672,
+      long: 72.83455,
     });
   };
 
@@ -114,7 +118,6 @@ export default function Login() {
       }
     );
   }, []);
-  
 
   return (
     <div
