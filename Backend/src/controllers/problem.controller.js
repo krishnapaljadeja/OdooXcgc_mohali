@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const uploadProblem = async (req, res) => {
   try {
-    const { title, description , category } = req.body;
+    const { title, description, category, isAnonymous } = req.body;
     const locationData = JSON.parse(req.body.location);
     const authorId = req.user.id;
 
@@ -13,34 +13,49 @@ export const uploadProblem = async (req, res) => {
     }
 
     const imageUrl = req.file.path;
-    
+    // Convert isAnonymous from string to boolean
+    const isAnonymousBoolean = isAnonymous === "true" || isAnonymous === true;
     // const { lat, lng } = locationData;
     // console.log(lat, lng);
 
-    const problem = await prisma.problem.create({
-      data: {
-        title,
-        description,
-        location: JSON.stringify(locationData),
-        image: imageUrl,
-        category,
-        user: {
-          connect: {
-            id: authorId,
+    let problem;
+    if (isAnonymousBoolean) {
+      problem = await prisma.problem.create({
+        data: {
+          title,
+          description,
+          location: JSON.stringify(locationData),
+          image: imageUrl,
+          category,
+          isAnonymous: isAnonymousBoolean,
+        },
+      });
+    } else {
+      problem = await prisma.problem.create({
+        data: {
+          title,
+          description,
+          location: JSON.stringify(locationData),
+          image: imageUrl,
+          category,
+          isAnonymous: isAnonymousBoolean,
+          user: {
+            connect: {
+              id: authorId,
+            },
           },
         },
-      },
-    });
+      });
 
-    const updatedUser = await prisma.user.update({
-      where: { id: authorId },
-      data: {
-        coins: {
-          increment: 5,
+      const updatedUser = await prisma.user.update({
+        where: { id: authorId },
+        data: {
+          coins: {
+            increment: 5,
+          },
         },
-      },
-    });
-
+      });
+    }
     return res
       .status(200)
       .json(new ApiResponse(200, "Problem uploaded successfully", problem));
@@ -52,65 +67,38 @@ export const uploadProblem = async (req, res) => {
 
 export const getAllProblems = async (req, res) => {
   try {
-    const radius = parseFloat(req.query.radius || '5'); // Default radius 5km
+    console.log("getAllProblems called with query params:", req.query);
+    const radius = parseFloat(req.query.radius || "5"); // Default radius 5km
     const userId = req.user.id;
+
+    console.log(
+      `getAllProblems called with radius: ${radius}km, userId: ${userId}`
+    );
 
     // Get user's current location
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { liveLocation: true }
+      select: { liveLocation: true },
     });
 
     if (!user || !user.liveLocation) {
+      console.log("User location not found");
       return res.status(400).json(new ApiError(400, "User location not found"));
     }
 
     // Parse user's live location
     const userLocation = user.liveLocation.split(",");
-    
+
     const userLat = parseFloat(userLocation[0]);
     const userLng = parseFloat(userLocation[1]);
-    console.log(userLat, userLng);
+    console.log(`User location: ${userLat}, ${userLng}, Radius: ${radius}km`);
+
     if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) {
-      return res.status(400).json(new ApiError(400, "Invalid user location format"));
+      console.log("Invalid user location format");
+      return res
+        .status(400)
+        .json(new ApiError(400, "Invalid user location format"));
     }
-
-    // First, let's check what problems exist and their coordinates
-    // const allProblems = await prisma.problem.findMany({
-    //   select: {
-    //     id: true,
-    //     title: true,
-    //     lat: true,
-    //     lang: true,
-    //     location: true
-    //   }
-    // });
-    
-    // console.log("All problems in database:", allProblems);
-
-    // Let's also try a simpler query first to see if we can get any problems
-    // const simpleProblems = await prisma.$queryRaw`
-    //   SELECT p.id, p.title, p.location, 
-    //          p.location::json->>'lat' as extracted_lat,
-    //          p.location::json->>'lng' as extracted_lng
-    //   FROM "problems" p
-    //   WHERE p.location IS NOT NULL 
-    //     AND p.location::json->>'lat' IS NOT NULL 
-    //     AND p.location::json->>'lng' IS NOT NULL
-    //   LIMIT 5;
-    // `;
-    
-    // Let's also check the actual column names in the database
-    // const columnInfo = await prisma.$queryRaw`
-    //   SELECT column_name, data_type 
-    //   FROM information_schema.columns 
-    //   WHERE table_name = 'problems' 
-    //   AND column_name IN ('lat', 'lang', 'lng');
-    // `;
-    
-    // console.log("Column info:", columnInfo);
-    
-    // console.log("Simple query results:", simpleProblems);
 
     // Use Haversine formula to find problems within radius
     const problems = await prisma.$queryRaw`
@@ -140,10 +128,16 @@ export const getAllProblems = async (req, res) => {
       ORDER BY distance_km ASC;
     `;
 
-    // console.log("Problems within radius:", problems);
+    console.log(
+      `Found ${problems?.length || 0} problems within ${radius}km radius`
+    );
 
     if (!problems || problems.length === 0) {
-      return res.status(404).json(new ApiError(404, "No problems found within the specified radius"));
+      return res
+        .status(404)
+        .json(
+          new ApiError(404, "No problems found within the specified radius")
+        );
     }
 
     return res
@@ -180,13 +174,11 @@ export const voting = async (req, res) => {
         select: { voteCount: true },
       });
 
-      return res
-        .status(200)
-        .json(
-          new ApiResponse(200, "Vote removed", {
-            voteCount: updatedProblem.voteCount,
-          })
-        );
+      return res.status(200).json(
+        new ApiResponse(200, "Vote removed", {
+          voteCount: updatedProblem.voteCount,
+        })
+      );
     } else {
       await prisma.$transaction([
         prisma.vote.create({ data: { userId, problemId } }),
@@ -201,13 +193,11 @@ export const voting = async (req, res) => {
         select: { voteCount: true },
       });
 
-      return res
-        .status(200)
-        .json(
-          new ApiResponse(200, "Vote added", {
-            voteCount: updatedProblem.voteCount,
-          })
-        );
+      return res.status(200).json(
+        new ApiResponse(200, "Vote added", {
+          voteCount: updatedProblem.voteCount,
+        })
+      );
     }
   } catch (err) {
     return res.status(500).json(new ApiError(500, err.message));
@@ -235,13 +225,11 @@ export const checkUserVote = async (req, res) => {
       },
     });
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, "Vote status retrieved", {
-          isVoted: !!existingVote,
-        })
-      );
+    return res.status(200).json(
+      new ApiResponse(200, "Vote status retrieved", {
+        isVoted: !!existingVote,
+      })
+    );
   } catch (err) {
     console.error("Error checking vote:", err);
     return res.status(500).json(new ApiError(500, "Internal Server Error"));
@@ -346,13 +334,11 @@ export const addOrUpdateRating = async (req, res) => {
       _avg: { rating: true },
     });
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, "Rating updated", {
-          averageRating: avgRating._avg.rating || 0,
-        })
-      );
+    return res.status(200).json(
+      new ApiResponse(200, "Rating updated", {
+        averageRating: avgRating._avg.rating || 0,
+      })
+    );
   } catch (err) {
     return res.status(500).json(new ApiError(500, err.message));
   }
@@ -368,13 +354,11 @@ export const getAverageRating = async (req, res) => {
       _avg: { rating: true },
     });
 
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, "Average rating fetched", {
-          averageRating: avgRating._avg.rating || 0,
-        })
-      );
+    return res.status(200).json(
+      new ApiResponse(200, "Average rating fetched", {
+        averageRating: avgRating._avg.rating || 0,
+      })
+    );
   } catch (err) {
     return res.status(500).json(new ApiError(500, err.message));
   }
