@@ -8,20 +8,21 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password, lat, long } = req.body;
 
-    let address = "";
+    // let address = "";
     console.log(lat , long)
 
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${long}&format=json`
-      );
-      if (!response.ok)
-        return res.status(402).json(new ApiError(402, "Location not found"));
-      const data = await response.json();
-      if (data.address.state_district) address = data.address.state_district;
-    } catch (fetchError) {
-      return res.status(402).json(new ApiError(402, "Location not found"));
-    }
+    // try {
+    //   const response = await fetch(
+    //     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${long}&format=json`
+    //   );
+    //   if (!response.ok)
+    //     return res.status(402).json(new ApiError(402, "Location not found"));
+    //   const data = await response.json();
+    //   if (data.address.state_district) address = data.address.state_district;
+    // } catch (fetchError) {
+    //   return res.status(402).json(new ApiError(402, "Location not found"));
+    // }
+
     const user = await prisma.user.findFirst({
       where: {
         email,
@@ -46,7 +47,7 @@ export const loginUser = async (req, res) => {
 
     res
       .status(200)
-      .json(new ApiResponse(200, "Login Successfull", { user, address }));
+      .json(new ApiResponse(200, "Login Successfull", { user }));
   } catch (err) {
     console.log(err);
     return res.status(500).json(new ApiError(500, "internal Server Error"));
@@ -73,21 +74,19 @@ export const signup = async (req, res) => {
     if (isExist) {
       return res.status(404).json(new ApiError(402, "User already exist"));
     }
-    let address = "";
-    let city = "";
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${long}&format=json`
-      );
-      if (!response.ok) throw new Error("Failed to fetch location data");
-      const data = await response.json();
-      if (data.display_name) {
-        address = data.display_name;
-        city = data.address.state_district;
-      }
-    } catch (fetchError) {
-      return res.status(402).json(new ApiError(402, "Location not found"));
-    }
+    // try {
+    //   const response = await fetch(
+    //     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${long}&format=json`
+    //   );
+    //   if (!response.ok) throw new Error("Failed to fetch location data");
+    //   const data = await response.json();
+    //   if (data.display_name) {
+    //     address = data.display_name;
+    //     city = data.address.state_district;
+    //   }
+    // } catch (fetchError) {
+    //   return res.status(402).json(new ApiError(402, "Location not found"));
+    // }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -95,12 +94,11 @@ export const signup = async (req, res) => {
         email,
         name,
         password: hashedPassword,
-        houseLocation: address,
-        city,
+        liveLocation: `${lat},${long}`,
         isGoverment: isGov,
       },
     });
-    address = address.split(",")[0];
+    // address = address.split(",")[0];
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
 
@@ -109,7 +107,7 @@ export const signup = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
     });
 
-    return res.status(201).json(new ApiResponse(200, {}, { user, address }));
+    return res.status(201).json(new ApiResponse(200, {}, { user }));
   } catch (err) {
     return res
       .status(500)

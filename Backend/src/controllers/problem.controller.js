@@ -46,12 +46,14 @@ export const uploadProblem = async (req, res) => {
     const imageUrl = req.file.path;
 
     // Call Django API to classify text
-    const category = await classifyText(description);
+    // const category = await classifyText(description);
+    const category = "LIGHTING";
     // console.log(locationData)
     // Extract latitude and longitude from locationData and call ML API to get cluster ID
     const { lat, lng } = locationData;
     console.log(lat, lng);
-    const clusterId = await getClusterId(lat, lng);
+    // const clusterId = await getClusterId(lat, lng);
+    const clusterId = 1;
 
     const problem = await prisma.problem.create({
       data: {
@@ -89,33 +91,105 @@ export const uploadProblem = async (req, res) => {
 
 export const getAllProblems = async (req, res) => {
   try {
-    // const { clustorId } = req.body;
-    const { latitude, longitude } = req.query;
-    const clustorId = await getClusterId(latitude, longitude);
-    console.log(clustorId);
+    const radius = parseFloat(req.query.radius || '5'); // Default radius 5km
+    const userId = req.user.id;
 
-    const problems = await prisma.problem.findMany({
-      where: {
-        clustorId,
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            profilePic: true,
-          },
-        },
-      },
+    // Get user's current location
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { liveLocation: true }
     });
 
-    if (!problems) {
-      return res.status(404).json(new ApiError(404, "Problem not found"));
+    if (!user || !user.liveLocation) {
+      return res.status(400).json(new ApiError(400, "User location not found"));
+    }
+
+    // Parse user's live location
+    const userLocation = user.liveLocation.split(",");
+    
+    const userLat = parseFloat(userLocation[0]);
+    const userLng = parseFloat(userLocation[1]);
+    console.log(userLat, userLng);
+    if (!userLat || !userLng || isNaN(userLat) || isNaN(userLng)) {
+      return res.status(400).json(new ApiError(400, "Invalid user location format"));
+    }
+
+    // First, let's check what problems exist and their coordinates
+    const allProblems = await prisma.problem.findMany({
+      select: {
+        id: true,
+        title: true,
+        lat: true,
+        lang: true,
+        location: true
+      }
+    });
+    
+    console.log("All problems in database:", allProblems);
+
+    // Let's also try a simpler query first to see if we can get any problems
+    const simpleProblems = await prisma.$queryRaw`
+      SELECT p.id, p.title, p.location, 
+             p.location::json->>'lat' as extracted_lat,
+             p.location::json->>'lng' as extracted_lng
+      FROM "problems" p
+      WHERE p.location IS NOT NULL 
+        AND p.location::json->>'lat' IS NOT NULL 
+        AND p.location::json->>'lng' IS NOT NULL
+      LIMIT 5;
+    `;
+    
+    // Let's also check the actual column names in the database
+    const columnInfo = await prisma.$queryRaw`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'problems' 
+      AND column_name IN ('lat', 'lang', 'lng');
+    `;
+    
+    console.log("Column info:", columnInfo);
+    
+    console.log("Simple query results:", simpleProblems);
+
+    // Use Haversine formula to find problems within radius
+    const problems = await prisma.$queryRaw`
+      SELECT 
+        p.*,
+        u.name as "userName",
+        u."profilePic" as "userProfilePic",
+        (
+          6371 * acos(
+            cos(radians(${userLat})) * cos(radians((p.location::json->>'lat')::float)) *
+            cos(radians((p.location::json->>'lng')::float) - radians(${userLng})) +
+            sin(radians(${userLat})) * sin(radians((p.location::json->>'lat')::float))
+          )
+        ) AS distance_km
+      FROM "problems" p
+      LEFT JOIN "User" u ON p."userId" = u.id
+      WHERE p.location IS NOT NULL 
+        AND p.location::json->>'lat' IS NOT NULL 
+        AND p.location::json->>'lng' IS NOT NULL
+        AND (
+          6371 * acos(
+            cos(radians(${userLat})) * cos(radians((p.location::json->>'lat')::float)) *
+            cos(radians((p.location::json->>'lng')::float) - radians(${userLng})) +
+            sin(radians(${userLat})) * sin(radians((p.location::json->>'lat')::float))
+          )
+        ) <= ${radius}
+      ORDER BY distance_km ASC;
+    `;
+
+    console.log("Problems within radius:", problems);
+
+    if (!problems || problems.length === 0) {
+      return res.status(404).json(new ApiError(404, "No problems found within the specified radius"));
     }
 
     return res
       .status(200)
-      .json(new ApiResponse(200, "Problem found", problems));
+      .json(new ApiResponse(200, "Problems found", problems));
   } catch (err) {
+    console.error("Error in getAllProblems:", err);
     return res.status(500).json(new ApiError(500, err.message));
   }
 };

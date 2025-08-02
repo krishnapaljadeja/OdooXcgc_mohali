@@ -15,9 +15,12 @@ enum Status {
 }
 
 enum Category {
-  INFRASTURCTURE
-  ENVIRONMENT
-  COMMUNITY_SERVICES
+  ROADS
+  LIGHTING
+  WATER
+  CLEANLINESS
+  PUBLIC_SAFETY
+  OBSTRUCTIONS
   OTHER
 }
 
@@ -26,8 +29,7 @@ model User {
   email         String   @unique
   name          String
   password      String
-  houseLocation String?
-  city          String?
+  liveLocation String?  
   rank          Int      @default(0)
   coins         Int?     @default(0)
   profilePic    String?
@@ -41,8 +43,8 @@ model User {
 
 model Problem {
   id          Int      @id @default(autoincrement())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      Int
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int?
   location    String
   clustorId   Int
   status      Status   @default(REPORTED)
