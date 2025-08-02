@@ -20,9 +20,12 @@ import {
 import { EmptyStateWithFilters } from "@/components/ui/empty-state";
 import ProblemList from "./ProblemCard";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useEffect, useState, useRef } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { toast } from "sonner";
+import axios from "axios";
+import { BASE_URL } from "@/lib/constant";
+import { setProblems } from "@/redux/problemSlice";
 
 const categories = [
   "All",
@@ -39,6 +42,7 @@ const distances = ["All", "1km", "3km", "5km"];
 
 export default function ProblemItem() {
   const user = useSelector((state) => state.user.user);
+  const dispatch = useDispatch();
   const [role, setRole] = useState("user");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
@@ -47,14 +51,88 @@ export default function ProblemItem() {
   const [sortBy, setSortBy] = useState("newest");
   const [isLoading, setIsLoading] = useState(false);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [isFetchingProblems, setIsFetchingProblems] = useState(false);
+  const isMountedRef = useRef(true);
 
   const problems = useSelector((state) => state.problem.problems);
+
+  // Function to fetch problems with distance parameter
+  const fetchProblemsWithDistance = async (latitude, longitude, radius) => {
+    if (!isMountedRef.current) return;
+
+    setIsFetchingProblems(true);
+    try {
+      const response = await axios.get(`${BASE_URL}/issue/all-problem`, {
+        withCredentials: true,
+        params: { 
+          latitude, 
+          longitude,
+          radius: radius || 5 // Default 5km if no radius specified
+        },
+        timeout: 10000,
+      });
+
+      if (response.data.success) {
+        dispatch(setProblems(response.data.message));
+        
+        if (!response.data.message || response.data.message.length === 0) {
+          toast.info("No issues found in the selected radius");
+        }
+      } else {
+        throw new Error(response.data.message || "Failed to fetch problems");
+      }
+    } catch (error) {
+      console.error("Error fetching problems:", error);
+      toast.error("Failed to load issues. Please try again.");
+    } finally {
+      if (isMountedRef.current) {
+        setIsFetchingProblems(false);
+      }
+    }
+  };
+
+  // Get user location on component mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+        },
+        (locationError) => {
+          console.warn("Location access denied:", locationError);
+          // Use default location if geolocation fails
+          setUserLocation({ latitude: 22.59672, longitude: 72.83455 });
+        },
+        {
+          timeout: 10000,
+          enableHighAccuracy: false,
+          maximumAge: 300000, // 5 minutes
+        }
+      );
+    } else {
+      // Use default location if geolocation is not supported
+      setUserLocation({ latitude: 22.59672, longitude: 72.83455 });
+    }
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
       setRole(user.isGoverment ? "goverment" : "user");
     }
   }, [user]);
+
+  // Fetch problems when user location is available
+  useEffect(() => {
+    if (userLocation && !isFetchingProblems) {
+      fetchProblemsWithDistance(userLocation.latitude, userLocation.longitude, 5);
+    }
+  }, [userLocation]);
 
   const isGovOfficial = role === "goverment";
 
@@ -112,17 +190,55 @@ export default function ProblemItem() {
     }
   }, [filteredProblems, sortBy]);
 
+  // Handle distance change and fetch problems
+  const handleDistanceChange = (distance) => {
+    setSelectedDistance(distance);
+    
+    if (!userLocation) {
+      toast.error("Location not available. Please allow location access.");
+      return;
+    }
+
+    // Convert distance string to radius in km
+    let radius;
+    switch (distance) {
+      case "1km":
+        radius = 1;
+        break;
+      case "3km":
+        radius = 3;
+        break;
+      case "5km":
+        radius = 5;
+        break;
+      case "All":
+        radius = 10; // Default larger radius for "All"
+        break;
+      default:
+        radius = 5;
+    }
+
+    // Fetch problems with the new radius
+    fetchProblemsWithDistance(userLocation.latitude, userLocation.longitude, radius);
+  };
+
   const handleClearFilters = () => {
     setSelectedCategory("All");
     setSelectedStatus("All");
     setSelectedDistance("All");
     setSearchQuery("");
     setShowFlaggedOnly(false);
+    
+    // Refetch problems with default radius when clearing filters
+    if (userLocation) {
+      fetchProblemsWithDistance(userLocation.latitude, userLocation.longitude, 10);
+    }
+    
     toast.success("Filters cleared");
   };
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading || isFetchingProblems) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
@@ -265,7 +381,8 @@ export default function ProblemItem() {
                 </label>
                 <Select
                   value={selectedDistance}
-                  onValueChange={setSelectedDistance}
+                  onValueChange={handleDistanceChange}
+                  disabled={isFetchingProblems}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select distance" />
@@ -273,11 +390,19 @@ export default function ProblemItem() {
                   <SelectContent>
                     {distances.map((distance) => (
                       <SelectItem key={distance} value={distance}>
-                        {distance === "All" ? "Any Distance" : distance}
+                        <div className="flex items-center justify-between w-full">
+                          <span>{distance === "All" ? "Any Distance" : distance}</span>
+                          {isFetchingProblems && selectedDistance === distance && (
+                            <LoadingSpinner className="w-4 h-4" />
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {isFetchingProblems && (
+                  <p className="text-xs text-gray-500 mt-1">Loading issues...</p>
+                )}
               </div>
 
               {/* Flagged Issues Filter - Only for Government Users */}
