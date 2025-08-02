@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Navigation, Loader2, CheckCircle } from "lucide-react";
+import { MapPin, Navigation, Loader2, CheckCircle, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import Top from "./Top";
 import { toast } from "sonner";
@@ -19,12 +18,6 @@ import {
 import { useDispatch } from "react-redux";
 import { addProblem } from "@/redux/problemSlice";
 
-const containerStyle = {
-  width: "100%",
-  height: "400px",
-  borderRadius: "0.75rem",
-};
-
 const center = {
   lat: 22.596878,
   lng: 72.83455,
@@ -38,8 +31,10 @@ function ReportIssue() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [image, setImage] = useState(null);
   const [location, setLocation] = useState(center);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [showMarker, setShowMarker] = useState(false);
+  const [mapContainer, setMapContainer] = useState(null);
+  const [map, setMap] = useState(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
@@ -52,14 +47,76 @@ function ReportIssue() {
     }
   };
 
-  const handleMapClick = useCallback((event) => {
-    const newLocation = {
-      lat: event.latLng.lat(),
-      lng: event.latLng.lng(),
+  // Initialize map when component mounts
+  useEffect(() => {
+    if (!mapContainer) return;
+
+    // Load Leaflet CSS
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+    link.crossOrigin = '';
+    document.head.appendChild(link);
+
+    // Load Leaflet JS
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    script.crossOrigin = '';
+    script.onload = () => {
+      initializeMap();
     };
-    setLocation(newLocation);
-    setShowMarker(true);
-  }, []);
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup
+      if (map) {
+        map.remove();
+      }
+    };
+  }, [mapContainer]);
+
+  const initializeMap = () => {
+    if (!window.L || !mapContainer) return;
+
+    const L = window.L;
+    
+    // Create map
+    const newMap = L.map(mapContainer).setView([center.lat, center.lng], 13);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(newMap);
+
+    // Add click handler for location selection
+    newMap.on('click', (e) => {
+      const newLocation = {
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+      };
+      setLocation(newLocation);
+      setShowMarker(true);
+      
+      // Add marker at clicked location
+      if (window.selectedMarker) {
+        newMap.removeLayer(window.selectedMarker);
+      }
+      
+      window.selectedMarker = L.marker([newLocation.lat, newLocation.lng], {
+        icon: L.divIcon({
+          className: 'selected-location-marker',
+          html: '<div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"><svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg></div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 24]
+        })
+      }).addTo(newMap);
+    });
+
+    setMap(newMap);
+    setIsMapLoaded(true);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,29 +169,45 @@ function ReportIssue() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const currentLocation = {
+          const newLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
-          setLocation(currentLocation);
+          setLocation(newLocation);
           setShowMarker(true);
+          
+          // Update map view and add marker
+          if (map && window.L) {
+            const L = window.L;
+            map.setView([newLocation.lat, newLocation.lng], 15);
+            
+            // Remove existing marker
+            if (window.selectedMarker) {
+              map.removeLayer(window.selectedMarker);
+            }
+            
+            // Add new marker
+            window.selectedMarker = L.marker([newLocation.lat, newLocation.lng], {
+              icon: L.divIcon({
+                className: 'selected-location-marker',
+                html: '<div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"><svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg></div>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 24]
+              })
+            }).addTo(map);
+          }
         },
         (error) => {
           console.error("Error getting location:", error);
+          toast.error("Failed to get your location. Please select manually.");
         }
       );
+    } else {
+      toast.error("Geolocation is not supported by this browser.");
     }
   };
 
-  const onMapLoad = useCallback(() => {
-    setIsMapLoaded(true);
-  }, []);
 
-  useEffect(() => {
-    if (!isMapLoaded) {
-      onMapLoad();
-    }
-  }, [isMapLoaded, onMapLoad]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -210,43 +283,19 @@ function ReportIssue() {
                   </div>
 
                   <div className="rounded-xl overflow-hidden border border-gray-200">
-                    <LoadScript googleMapsApiKey="AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&libraries=places&callback=initMap">
-                      <GoogleMap
-                        mapContainerStyle={containerStyle}
-                        center={location}
-                        zoom={14}
-                        onClick={handleMapClick}
-                        onLoad={onMapLoad}
-                        options={{
-                          styles: [
-                            {
-                              featureType: "all",
-                              elementType: "geometry",
-                              stylers: [{ gamma: 0.9 }],
-                            },
-                          ],
-                          zoomControl: true,
-                          mapTypeControl: false,
-                          scaleControl: false,
-                          streetViewControl: false,
-                          rotateControl: false,
-                          fullscreenControl: false,
-                        }}
-                      >
-                        {showMarker && (
-                          <Marker
-                            position={location}
-                            animation={window.google?.maps.Animation.DROP}
-                            icon={{
-                              url: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
-                              scaledSize: new window.google.maps.Size(40, 40),
-                              origin: new window.google.maps.Point(0, 0),
-                              anchor: new window.google.maps.Point(20, 40),
-                            }}
-                          />
-                        )}
-                      </GoogleMap>
-                    </LoadScript>
+                    <div 
+                      ref={setMapContainer}
+                      className="w-full h-[400px] relative"
+                    >
+                      {!isMapLoaded && (
+                        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-gray-600 font-medium">Loading Map...</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
