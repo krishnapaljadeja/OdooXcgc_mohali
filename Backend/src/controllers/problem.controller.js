@@ -4,7 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 
 export const uploadProblem = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, description , category } = req.body;
     const locationData = JSON.parse(req.body.location);
     const authorId = req.user.id;
 
@@ -13,8 +13,6 @@ export const uploadProblem = async (req, res) => {
     }
 
     const imageUrl = req.file.path;
-
-    const category = "LIGHTING";
     
     // const { lat, lng } = locationData;
     // console.log(lat, lng);

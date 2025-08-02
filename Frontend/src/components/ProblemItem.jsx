@@ -26,9 +26,13 @@ import { toast } from "sonner";
 
 const categories = [
   "All",
-  "INFRASTURCTURE",
-  "ENVIROUNMENT",
-  "COMMUNITY_SERVICES",
+  "ROADS",
+  "LIGHTING",
+  "WATER",
+  "CLEANLINESS",
+  "PUBLIC_SAFETY",
+  "OBSTRUCTIONS",
+  "OTHER",
 ];
 const statuses = ["All", "REPORTED", "IN_PROGRESS", "COMPLETED"];
 const distances = ["All", "1km", "3km", "5km"];

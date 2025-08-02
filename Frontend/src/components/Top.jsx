@@ -39,7 +39,16 @@ export default function Top({
   const [dragActive, setDragActive] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
 
-  const categories = ["INFRASTURCTURE", "ENVIROUNMENT", "COMMUNITY_SERVICES"];
+const categories = [
+  "All",
+  "ROADS",
+  "LIGHTING",
+  "WATER",
+  "CLEANLINESS",
+  "PUBLIC_SAFETY",
+  "OBSTRUCTIONS",
+  "OTHER",
+];
 
   const handleDrag = (e) => {
     e.preventDefault();
