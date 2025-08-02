@@ -28,6 +28,172 @@ import { BASE_URL } from "@/lib/constant";
 import { useDispatch } from "react-redux";
 import { updateProblemRating } from "@/redux/problemSlice";
 
+// Location Display Component
+const LocationDisplay = ({ location }) => {
+  const [address, setAddress] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    if (location) {
+      fetchAddressFromCoordinates();
+    }
+  }, [location]);
+
+  const fetchAddressFromCoordinates = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      // Parse location data
+      let locationData;
+      if (typeof location === 'string') {
+        locationData = JSON.parse(location);
+      } else {
+        locationData = location;
+      }
+
+      // If we already have an address, use it
+      if (locationData.address) {
+        setAddress(locationData.address);
+        return;
+      }
+
+      // If we have coordinates, fetch address from OpenStreetMap
+      if (locationData.coordinates?.lat && locationData.coordinates?.lng) {
+        const { lat, lng } = locationData.coordinates;
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
+        );
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch address");
+        }
+        
+        const data = await response.json();
+        if (data.display_name) {
+          setAddress(data.display_name);
+        } else {
+          setError("Address not found");
+        }
+      } else if (locationData.lat && locationData.lng) {
+        // Handle direct lat/lng format
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${locationData.lat}&lon=${locationData.lng}&format=json&addressdetails=1`
+        );
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch address");
+        }
+        
+        const data = await response.json();
+        if (data.display_name) {
+          setAddress(data.display_name);
+        } else {
+          setError("Address not found");
+        }
+      } else {
+        setError("No location data available");
+      }
+    } catch (err) {
+      console.error("Error fetching address:", err);
+      setError("Failed to load address");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCoordinates = () => {
+    if (!location) return null;
+    
+    let locationData;
+    if (typeof location === 'string') {
+      locationData = JSON.parse(location);
+    } else {
+      locationData = location;
+    }
+
+    if (locationData.coordinates?.lat && locationData.coordinates?.lng) {
+      return {
+        lat: locationData.coordinates.lat,
+        lng: locationData.coordinates.lng
+      };
+    } else if (locationData.lat && locationData.lng) {
+      return {
+        lat: locationData.lat,
+        lng: locationData.lng
+      };
+    }
+    return null;
+  };
+
+  const coordinates = getCoordinates();
+
+  return (
+    <div className="space-y-3">
+      {/* Address Display */}
+      <div>
+        {loading ? (
+          <div className="flex items-center gap-2 text-gray-600">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading address...</span>
+          </div>
+        ) : error ? (
+          <div className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-4 h-4" />
+            <span>{error}</span>
+          </div>
+        ) : address ? (
+          <p className="text-gray-700 leading-relaxed">{address}</p>
+        ) : (
+          <p className="text-gray-500">Address not available</p>
+        )}
+      </div>
+
+      {/* Coordinates Display */}
+      {coordinates && (
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Coordinates:</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(`${coordinates.lat}, ${coordinates.lng}`);
+                toast.success("Coordinates copied to clipboard!");
+              }}
+              className="text-xs"
+            >
+              Copy
+            </Button>
+          </div>
+          <p className="text-sm text-gray-600 mt-1 font-mono">
+            {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+          </p>
+        </div>
+      )}
+
+      {/* Map Link */}
+      {coordinates && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const url = `https://www.openstreetmap.org/?mlat=${coordinates.lat}&mlon=${coordinates.lng}&zoom=15`;
+              window.open(url, '_blank');
+            }}
+            className="flex items-center gap-2"
+          >
+            <MapPin className="w-4 h-4" />
+            View on Map
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function IssueDetailModal({
   issue,
   isOpen,
@@ -53,7 +219,7 @@ export default function IssueDetailModal({
   React.useEffect(() => {
     let isMounted = true;
 
-    if (issue && isOpen) {
+    if (issue?.id && isOpen) {
       const fetchData = async () => {
         await fetchIssueDetails();
         await fetchStatusHistory();
@@ -66,7 +232,7 @@ export default function IssueDetailModal({
     return () => {
       isMounted = false;
     };
-  }, [issue, isOpen]);
+  }, [issue?.id, isOpen]);
 
   const fetchIssueDetails = async () => {
     try {
@@ -571,34 +737,25 @@ export default function IssueDetailModal({
                           <span>
                             {issue.isAnonymous
                               ? "Anonymous User"
-                              : issue.user?.name || "Unknown User"}
+                              : issue.userName|| "Unknown User"}
                           </span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* Location */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <MapPin className="w-5 h-5" />
-                        Location
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-700">
-                        {issue.location?.address ||
-                          "Location coordinates available"}
-                      </p>
-                      {issue.location?.coordinates && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          {issue.location.coordinates.lat.toFixed(6)},{" "}
-                          {issue.location.coordinates.lng.toFixed(6)}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
+                                     {/* Location */}
+                   <Card>
+                     <CardHeader>
+                       <CardTitle className="flex items-center gap-2">
+                         <MapPin className="w-5 h-5" />
+                         Location
+                       </CardTitle>
+                     </CardHeader>
+                     <CardContent>
+                       <LocationDisplay location={issue.location} />
+                     </CardContent>
+                   </Card>
 
                   {/* Status History */}
                   <Card>
