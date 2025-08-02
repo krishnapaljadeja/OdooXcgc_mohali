@@ -30,7 +30,12 @@ function App() {
             <Route path="/analytics2" element={<Analytics2 />} />
           </Routes>
         </div>
-        <Toaster position="top-right" richColors closeButton duration={4000} />
+        <Toaster
+          position="bottom-right"
+          richColors
+          closeButton
+          duration={4000}
+        />
       </Router>
     </ErrorBoundary>
   );
