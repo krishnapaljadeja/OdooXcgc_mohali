@@ -1,5 +1,7 @@
 🏙️ CivicTrack
 
+Demo video link - https://drive.google.com/drive/folders/1DwUIKiOeC0yNg0fYVFZZTgd8v3cXPED-?usp=sharing
+
 **CivicTrack** empowers citizens to report and track local civic issues — such as road damage, water leaks, garbage, and safety hazards — within their neighborhood. It ensures transparency and faster resolution by enabling real-time status tracking and hyperlocal engagement.
 
 ---
