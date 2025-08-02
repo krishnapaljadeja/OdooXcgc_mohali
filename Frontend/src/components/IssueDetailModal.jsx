@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import axios from "axios";
 import { BASE_URL } from "@/lib/constant";
 import { useDispatch } from "react-redux";
-import { updateProblemRating } from "@/redux/problemSlice";
+import { updateProblemRating, updateProblemStatus } from "@/redux/problemSlice";
 
 // Location Display Component
 const LocationDisplay = ({ location }) => {
@@ -47,7 +47,7 @@ const LocationDisplay = ({ location }) => {
 
       // Parse location data
       let locationData;
-      if (typeof location === 'string') {
+      if (typeof location === "string") {
         locationData = JSON.parse(location);
       } else {
         locationData = location;
@@ -65,11 +65,11 @@ const LocationDisplay = ({ location }) => {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
         );
-        
+
         if (!response.ok) {
           throw new Error("Failed to fetch address");
         }
-        
+
         const data = await response.json();
         if (data.display_name) {
           setAddress(data.display_name);
@@ -81,11 +81,11 @@ const LocationDisplay = ({ location }) => {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${locationData.lat}&lon=${locationData.lng}&format=json&addressdetails=1`
         );
-        
+
         if (!response.ok) {
           throw new Error("Failed to fetch address");
         }
-        
+
         const data = await response.json();
         if (data.display_name) {
           setAddress(data.display_name);
@@ -105,9 +105,9 @@ const LocationDisplay = ({ location }) => {
 
   const getCoordinates = () => {
     if (!location) return null;
-    
+
     let locationData;
-    if (typeof location === 'string') {
+    if (typeof location === "string") {
       locationData = JSON.parse(location);
     } else {
       locationData = location;
@@ -116,12 +116,12 @@ const LocationDisplay = ({ location }) => {
     if (locationData.coordinates?.lat && locationData.coordinates?.lng) {
       return {
         lat: locationData.coordinates.lat,
-        lng: locationData.coordinates.lng
+        lng: locationData.coordinates.lng,
       };
     } else if (locationData.lat && locationData.lng) {
       return {
         lat: locationData.lat,
-        lng: locationData.lng
+        lng: locationData.lng,
       };
     }
     return null;
@@ -154,12 +154,16 @@ const LocationDisplay = ({ location }) => {
       {coordinates && (
         <div className="bg-gray-50 p-3 rounded-lg">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Coordinates:</span>
+            <span className="text-sm font-medium text-gray-700">
+              Coordinates:
+            </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                navigator.clipboard.writeText(`${coordinates.lat}, ${coordinates.lng}`);
+                navigator.clipboard.writeText(
+                  `${coordinates.lat}, ${coordinates.lng}`
+                );
                 toast.success("Coordinates copied to clipboard!");
               }}
               className="text-xs"
@@ -181,7 +185,7 @@ const LocationDisplay = ({ location }) => {
             size="sm"
             onClick={() => {
               const url = `https://www.openstreetmap.org/?mlat=${coordinates.lat}&mlon=${coordinates.lng}&zoom=15`;
-              window.open(url, '_blank');
+              window.open(url, "_blank");
             }}
             className="flex items-center gap-2"
           >
@@ -402,18 +406,23 @@ export default function IssueDetailModal({
     setLoading(true);
     try {
       let endpoint;
+      let newStatus;
       switch (action) {
         case "approve":
           endpoint = `${BASE_URL}/gov/approve/${issue.id}`;
+          newStatus = "IN_PROGRESS";
           break;
         case "reject":
           endpoint = `${BASE_URL}/gov/reject/${issue.id}`;
+          newStatus = "REJECTED";
           break;
         case "complete":
           endpoint = `${BASE_URL}/gov/complete/${issue.id}`;
+          newStatus = "COMPLETED";
           break;
         case "ban":
           endpoint = `${BASE_URL}/gov/ban/${issue.id}`;
+          newStatus = "BANNED";
           break;
         default:
           throw new Error("Invalid action");
@@ -421,18 +430,17 @@ export default function IssueDetailModal({
 
       const res = await axios.post(endpoint, {}, { withCredentials: true });
       if (res.data.success) {
-        const newStatus =
-          action === "approve"
-            ? "IN_PROGRESS"
-            : action === "reject"
-            ? "REJECTED"
-            : action === "complete"
-            ? "COMPLETED"
-            : action === "ban"
-            ? "BANNED"
-            : issue.status;
+        // Update Redux store directly
+        dispatch(
+          updateProblemStatus({
+            problemId: issue.id,
+            status: newStatus,
+          })
+        );
 
+        // Also call the parent's onStatusUpdate for backward compatibility
         onStatusUpdate(issue.id, newStatus);
+
         toast.success(
           action === "approve"
             ? "Problem approved successfully"
@@ -737,25 +745,25 @@ export default function IssueDetailModal({
                           <span>
                             {issue.isAnonymous
                               ? "Anonymous User"
-                              : issue.userName|| "Unknown User"}
+                              : issue.userName || "Unknown User"}
                           </span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                                     {/* Location */}
-                   <Card>
-                     <CardHeader>
-                       <CardTitle className="flex items-center gap-2">
-                         <MapPin className="w-5 h-5" />
-                         Location
-                       </CardTitle>
-                     </CardHeader>
-                     <CardContent>
-                       <LocationDisplay location={issue.location} />
-                     </CardContent>
-                   </Card>
+                  {/* Location */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MapPin className="w-5 h-5" />
+                        Location
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <LocationDisplay location={issue.location} />
+                    </CardContent>
+                  </Card>
 
                   {/* Status History */}
                   <Card>

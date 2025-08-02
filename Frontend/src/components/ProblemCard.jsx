@@ -30,7 +30,11 @@ import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import { BASE_URL } from "@/lib/constant";
 import { toast } from "sonner";
-import { deleteProblem, updateProblemRating } from "@/redux/problemSlice";
+import {
+  deleteProblem,
+  updateProblemRating,
+  updateProblemStatus,
+} from "@/redux/problemSlice";
 import IssueDetailModal from "./IssueDetailModal";
 
 function ProblemCard({ problem, isGovOfficial }) {
@@ -39,7 +43,8 @@ function ProblemCard({ problem, isGovOfficial }) {
   const [averageRating, setAverageRating] = useState(0);
   const [isVoted, setIsVoted] = useState(false);
   const [voteCount, setVoteCount] = useState(problem.voteCount || 0);
-  const [status, setStatus] = useState(problem.status);
+  // Use status directly from problem prop (which comes from Redux)
+  const status = problem.status;
   const [loading, setLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
@@ -204,15 +209,19 @@ function ProblemCard({ problem, isGovOfficial }) {
     setLoading(true);
     try {
       let endpoint;
+      let newStatus;
       switch (action) {
         case "approve":
           endpoint = `${BASE_URL}/gov/approve/${problem.id}`;
+          newStatus = "IN_PROGRESS";
           break;
         case "reject":
           endpoint = `${BASE_URL}/gov/reject/${problem.id}`;
+          newStatus = "REJECTED";
           break;
         case "complete":
           endpoint = `${BASE_URL}/gov/complete/${problem.id}`;
+          newStatus = "COMPLETED";
           break;
         default:
           throw new Error("Invalid action");
@@ -220,15 +229,14 @@ function ProblemCard({ problem, isGovOfficial }) {
 
       const res = await axios.post(endpoint, {}, { withCredentials: true });
       if (res.data.success) {
-        setStatus(
-          action === "approve"
-            ? "IN_PROGRESS"
-            : action === "reject"
-            ? "REJECTED"
-            : action === "complete"
-            ? "COMPLETED"
-            : status
+        // Update Redux store
+        dispatch(
+          updateProblemStatus({
+            problemId: problem.id,
+            status: newStatus,
+          })
         );
+
         toast.success(
           action === "approve"
             ? "Problem approved successfully"
@@ -348,7 +356,13 @@ function ProblemCard({ problem, isGovOfficial }) {
 
   const handleStatusUpdate = (problemId, newStatus) => {
     if (problemId === problem.id) {
-      setStatus(newStatus);
+      // Update Redux store
+      dispatch(
+        updateProblemStatus({
+          problemId: problem.id,
+          status: newStatus,
+        })
+      );
     }
   };
 
@@ -524,7 +538,7 @@ function ProblemCard({ problem, isGovOfficial }) {
                 <p className="text-sm font-medium text-gray-900">
                   {problem.isAnonymous
                     ? "Anonymous User"
-                    : problem?.userName|| "Unknown User"}
+                    : problem?.userName || "Unknown User"}
                 </p>
                 <p className="text-xs text-gray-500">Community Member</p>
               </div>

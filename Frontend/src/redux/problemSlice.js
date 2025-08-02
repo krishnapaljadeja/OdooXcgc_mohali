@@ -31,9 +31,26 @@ const problemSlice = createSlice({
         };
       }
     },
+    updateProblemStatus: (state, action) => {
+      const { problemId, status } = action.payload;
+      const problemIndex = state.problems.findIndex(
+        (problem) => problem.id === problemId
+      );
+      if (problemIndex !== -1) {
+        state.problems[problemIndex] = {
+          ...state.problems[problemIndex],
+          status,
+        };
+      }
+    },
   },
 });
 
-export const { setProblems, addProblem, deleteProblem, updateProblemRating } =
-  problemSlice.actions;
+export const {
+  setProblems,
+  addProblem,
+  deleteProblem,
+  updateProblemRating,
+  updateProblemStatus,
+} = problemSlice.actions;
 export default problemSlice.reducer;
